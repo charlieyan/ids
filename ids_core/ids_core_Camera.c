@@ -108,22 +108,22 @@ static void ids_core_Camera_dealloc(ids_core_Camera *self) {
  * the Camera object with it.
  */
 static int init_cam_info(ids_core_Camera *self) {
-    PyObject *info, *width, *height, *manufacturer, *sensor;
+    PyObject *info, *aoi_image_size_w, *aoi_image_size_h, *manufacturer, *sensor;
 
     info = ids_core_Camera_getinfo(self, NULL);
     if (!info) {
         return -1;
     }
 
-    width = PyDict_GetItemString(info, "max_width");
-    if (!width) {
-        PyErr_SetString(PyExc_KeyError, "'max_width'");
+    aoi_image_size_w = PyDict_GetItemString(info, "aoi_image_size_w");
+    if (!aoi_image_size_w) {
+        PyErr_SetString(PyExc_KeyError, "'aoi_image_size_w'");
         return -1;
     }
 
-    height = PyDict_GetItemString(info, "max_height");
-    if (!width) {
-        PyErr_SetString(PyExc_KeyError, "'max_height'");
+    aoi_image_size_h = PyDict_GetItemString(info, "aoi_image_size_h");
+    if (!aoi_image_size_h) {
+        PyErr_SetString(PyExc_KeyError, "'aoi_image_size_h'");
         return -1;
     }
 
@@ -139,12 +139,12 @@ static int init_cam_info(ids_core_Camera *self) {
         return -1;
     }
 
-    self->width = PyLong_AsLong(width);
-    self->height = PyLong_AsLong(height);
-
-    self->name = PyBytes_FromFormat("%s %s", PyBytes_AsString(manufacturer),
-                                    PyBytes_AsString(sensor));
-
+    self->width     = PyLong_AsLong(aoi_image_size_w);
+    self->height    = PyLong_AsLong(aoi_image_size_h);
+    self->name = PyBytes_FromFormat(
+        "%s %s", 
+        PyBytes_AsString(manufacturer), 
+        PyBytes_AsString(sensor));
     Py_DECREF(info);
 
     return 0;
@@ -154,7 +154,7 @@ static int ids_core_Camera_init(ids_core_Camera *self, PyObject *args, PyObject 
     static char *kwlist[] = {"handle", "color", NULL};
     self->handle = 0;
     self->bitdepth = 0;
-    self->color = IS_CM_RGB8_PACKED;
+    self->color = IS_CM_JPEG; // JPEG color mode
     self->autofeatures = 0;
     self->ready = NOT_READY;
     LIST_INIT(&self->mem_list);
@@ -169,6 +169,7 @@ static int ids_core_Camera_init(ids_core_Camera *self, PyObject *args, PyObject 
     }
 
     int ret = is_InitCamera(&self->handle, NULL);
+
     switch (ret) {
     case IS_SUCCESS:
         break;

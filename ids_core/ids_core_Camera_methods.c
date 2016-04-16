@@ -124,18 +124,30 @@ static PyObject *ids_core_Camera_alloc(ids_core_Camera *self, PyObject *args, Py
     char *mem;
     int id, ret;
 
-    ret = is_AllocImageMem(self->handle, self->width, self->height,
-                           self->bitdepth, &mem, &id);
+    ret = is_AllocImageMem(self->handle, self->width, self->height, self->bitdepth, &mem, &id);
     if (ret != IS_SUCCESS) {
         goto err;
     }
 
     ret = is_AddToSequence(self->handle, mem, id);
+    /*
+    is_AddToSequence() adds an image memory to the list of image memories used for ring buffering. 
+    The image memory must have been previously requested using is_AllocImageMem(). 
+    Using the is_SetAllocatedImageMem() function, you can set a memory that has been allocated before as image memory. 
+    Image memories that are used for ring buffering must all have been allocated with the same color depth (bits per pixel).
+    */
+
     if (ret != IS_SUCCESS) {
         goto err_free;
     }
 
     if (add_mem(self, mem, id) != 0) {
+        goto err_free;
+    }
+
+    ret = is_SetImageMem(self->handle, mem, id);
+    if (ret != IS_SUCCESS) {
+        printf("CHARLIE UNABLE TO is_SetImageMem");
         goto err_free;
     }
 
@@ -184,6 +196,7 @@ static int get_next_image(ids_core_Camera *self, char **mem, INT *image_id) {
 
     switch (ret) {
     case IS_SUCCESS:
+        printf("Charlie successfully got image!");
         break;
     case IS_TIMED_OUT:
         PyErr_Format(IDSTimeoutError, "Timeout of %dms exceeded", IMG_TIMEOUT);
@@ -331,7 +344,8 @@ static PyObject *create_matrix(ids_core_Camera *self, char *mem) {
     case IS_CM_RGBA8_PACKED:
     case IS_CM_RGBY8_PACKED: 
     case IS_CM_BGR8_PACKED:
-    case IS_CM_RGB8_PACKED: {
+    case IS_CM_RGB8_PACKED:
+    case IS_CM_JPEG: {
         npy_intp dims[3];
         dims[0] = self->height;
         dims[1] = self->width;

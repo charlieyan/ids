@@ -31,24 +31,49 @@
 
 #include "ids_core.h"
 
+
 PyObject *ids_core_Camera_getinfo(ids_core_Camera *self, void *closure) {
-    CAMINFO cam_info;
-    SENSORINFO sensor_info;
+    CAMINFO     cam_info;
+    SENSORINFO  sensor_info;
+    IS_SIZE_2D  image_size;
+    UINT        abs_pos_x = 0, abs_pos_y = 0;
 
     int ret = is_GetCameraInfo(self->handle, &cam_info);
     if (ret != IS_SUCCESS) {
-        raise_general_error(self, ret);
-        return NULL;
+        raise_general_error(self, ret); return NULL;
     }
 
     ret = is_GetSensorInfo(self->handle, &sensor_info);
     if (ret != IS_SUCCESS) {
-        raise_general_error(self, ret);
-        return NULL;
+        raise_general_error(self, ret); return NULL;
+    }
+
+    // AOI = Area of Interest
+    int aoi_image_size_w    = 0;
+    int aoi_image_size_h    = 0;
+    ret = is_AOI(self->handle, IS_AOI_IMAGE_GET_SIZE, (void*)&image_size, sizeof(image_size));
+    if (ret != IS_SUCCESS) {
+        raise_general_error(self, ret); return NULL;
+    }
+    aoi_image_size_w    = image_size.s32Width;
+    aoi_image_size_h    = image_size.s32Height;
+
+    ret = is_AOI(self->handle, IS_AOI_IMAGE_GET_POS_X_ABS, (void*)&abs_pos_x, sizeof(abs_pos_x));
+    if (ret != IS_SUCCESS) {
+        raise_general_error(self, ret); return NULL;
+    }
+    ret = is_AOI(self->handle, IS_AOI_IMAGE_GET_POS_Y_ABS, (void*)&abs_pos_y, sizeof(abs_pos_y));
+    if (ret != IS_SUCCESS) {
+        raise_general_error(self, ret); return NULL;
+    }
+    if (abs_pos_x) {
+        aoi_image_size_w    = sensor_info.nMaxWidth;
+    }
+    if (abs_pos_y) {
+        aoi_image_size_h    = sensor_info.nMaxHeight;
     }
 
     PyObject *dict = PyDict_New();
-
     PyObject *serial_num = PyBytes_FromString(cam_info.SerNo);
     PyObject *manufacturer = PyBytes_FromString(cam_info.ID);
     PyObject *hw_version = PyBytes_FromString(cam_info.Version);
@@ -59,6 +84,10 @@ PyObject *ids_core_Camera_getinfo(ids_core_Camera *self, void *closure) {
     PyObject *max_width = Py_BuildValue("I", sensor_info.nMaxWidth);
     PyObject *max_height = Py_BuildValue("I", sensor_info.nMaxHeight);
     PyObject *pixel_size = Py_BuildValue("d", sensor_info.wPixelSize/100.0);
+    PyObject *aoi_image_size_w_obj = Py_BuildValue("I", aoi_image_size_w);
+    PyObject *aoi_image_size_h_obj = Py_BuildValue("I", aoi_image_size_h);
+    PyObject *abs_pos_x_obj = Py_BuildValue("I", abs_pos_x);
+    PyObject *abs_pos_y_obj = Py_BuildValue("I", abs_pos_y);
 
     PyObject *type;
     switch (cam_info.Type) {
@@ -117,6 +146,10 @@ PyObject *ids_core_Camera_getinfo(ids_core_Camera *self, void *closure) {
     PyDict_SetItemString(dict, "type", type);
     PyDict_SetItemString(dict, "color_mode", color_mode);
     PyDict_SetItemString(dict, "pixel_size", pixel_size);   /* in um */
+    PyDict_SetItemString(dict, "aoi_image_size_w", aoi_image_size_w_obj);
+    PyDict_SetItemString(dict, "aoi_image_size_h", aoi_image_size_h_obj);
+    PyDict_SetItemString(dict, "abs_pos_x", abs_pos_x_obj);
+    PyDict_SetItemString(dict, "abs_pos_y", abs_pos_y_obj);
 
     /* Gains */
     if (sensor_info.bMasterGain) {
@@ -167,6 +200,10 @@ PyObject *ids_core_Camera_getinfo(ids_core_Camera *self, void *closure) {
     Py_DECREF(type);
     Py_DECREF(color_mode);
     Py_DECREF(pixel_size);
+    Py_DECREF(aoi_image_size_w_obj);
+    Py_DECREF(aoi_image_size_h_obj);
+    Py_DECREF(abs_pos_x_obj);
+    Py_DECREF(abs_pos_y_obj);
 
     return dict;
 }
